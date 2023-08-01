@@ -118,7 +118,8 @@
 
         yearSum += income.amount;
 
-        if (month === currentMonth) {
+        // We always calculate income sum for previous month
+        if (month === currentMonth - 1) {
           monthSum += income.amount;
         }
 
