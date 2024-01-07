@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { format, getMonth } from "date-fns";
+  import { format, getMonth, getYear } from "date-fns";
   import { IconTrash } from "@tabler/icons-svelte";
 
   import { css } from "styled-system/css";
@@ -47,7 +47,14 @@
   const now = new Date();
   const today = format(now, "yyyy-MM-dd");
   const currentMonth = getMonth(now);
-  const monthsTillPresent = MONTHS.slice(0, currentMonth + 1);
+  const currentYear = getYear(now);
+
+  const settlementMonth = currentMonth > 0 ? currentMonth - 1 : 11;
+  const settlementYear = currentMonth > 0 ? currentYear : currentYear - 1;
+
+  const getMonthsTillPresent = (year: number) => {
+    return year === currentYear ? MONTHS.slice(0, currentMonth + 1) : MONTHS;
+  };
 
   let loading = false;
 
@@ -92,7 +99,8 @@
 
   let yearSum = 0;
   let monthSum = 0;
-  let incomes: Record<number, IncomeExt[]> = {};
+  let incomes: Record<number, Record<number, IncomeExt[]>> = {};
+  let incomeYears = new Set<number>();
 
   const loadRecords = async () => {
     const { data } = await supabase.from("records").select<"*", Income>();
@@ -106,24 +114,33 @@
       records.sort((a, b) => a.date - b.date);
 
       incomes = {};
+      incomeYears = new Set([currentYear]);
       yearSum = 0;
       monthSum = 0;
 
       for (const income of records) {
+        const year = getYear(income.date);
         const month = getMonth(income.date);
 
-        if (!incomes[month]) {
-          incomes[month] = [];
+        if (!incomes[year]) {
+          incomes[year] = {};
         }
 
-        yearSum += income.amount;
+        if (!incomes[year][month]) {
+          incomes[year][month] = [];
+        }
+
+        if (year === settlementYear) {
+          yearSum += income.amount;
+        }
 
         // We always calculate income sum for previous month
-        if (month === currentMonth - 1) {
+        if (month === settlementMonth) {
           monthSum += income.amount;
         }
 
-        incomes[month].push(income);
+        incomes[year][month].push(income);
+        incomeYears.add(year);
       }
     }
   };
@@ -177,74 +194,92 @@
         <User email={session.user.email} {signOut} />
       </div>
 
-      {#each monthsTillPresent as month, i}
-        <div>
-          <div
-            class={css({
-              fontSize: "sm",
-              fontWeight: "semibold",
-              color: "slate.600",
-              mb: 1,
-            })}
-          >
-            {month}
-          </div>
+      {#each Array.from(incomeYears).sort() as year}
+        <div
+          class={css({
+            fontSize: "sm",
+            py: 1,
+            px: 4,
+            mx: "auto",
+            fontWeight: "semibold",
+            textAlign: "center",
+            color: "slate.500",
+            bg: "slate.100",
+            rounded: "full",
+          })}
+        >
+          {year}
+        </div>
 
-          {#if incomes[i]}
-            <table class={table()}>
-              {#each incomes[i] as { id, date, income, currency, rate, amount }}
-                <tr>
-                  <td class={css({ color: "slate.500" })}>
-                    {format(date, "d MMMM yyyy")}
-                  </td>
-                  <td>
-                    <div
-                      class={grid({
-                        gap: 0,
-                        textAlign: "center",
-                        columns: { base: 2, xs: 3 },
-                      })}
-                    >
-                      <Amount value={income} {currency} />
+        {#each getMonthsTillPresent(year) as month, i}
+          <div>
+            <div
+              class={css({
+                fontSize: "sm",
+                fontWeight: "semibold",
+                color: "slate.600",
+                mb: 1,
+              })}
+            >
+              {month}
+            </div>
 
+            {#if incomes[year] && incomes[year][i]}
+              <table class={table()}>
+                {#each incomes[year][i] as { id, date, income, currency, rate, amount }}
+                  <tr>
+                    <td class={css({ color: "slate.500" })}>
+                      {format(date, "d MMMM yyyy")}
+                    </td>
+                    <td>
                       <div
-                        class={css({
-                          py: 0.5,
-                          display: { base: "none", xs: "block" },
+                        class={grid({
+                          gap: 0,
+                          textAlign: "center",
+                          columns: { base: 2, xs: 3 },
                         })}
                       >
-                        <a
-                          href="https://nbg.gov.ge/en/monetary-policy/currency"
-                          target="_blank"
+                        <Amount value={income} {currency} />
+
+                        <div
                           class={css({
-                            color: "slate.400",
-                            fontFamily: "mono",
+                            py: 0.5,
+                            display: { base: "none", xs: "block" },
                           })}
                         >
-                          ×{rate.toFixed(4)}
-                        </a>
-                      </div>
+                          <a
+                            href="https://nbg.gov.ge/en/monetary-policy/currency"
+                            target="_blank"
+                            class={css({
+                              color: "slate.400",
+                              fontFamily: "mono",
+                            })}
+                          >
+                            ×{rate.toFixed(4)}
+                          </a>
+                        </div>
 
-                      <Amount value={amount} currency="GEL" />
-                    </div>
-                  </td>
-                  <td>
-                    <button
-                      class={button({ variant: "icon" })}
-                      on:click={() => deleteRecord(id)}
-                    >
-                      <IconTrash size={14} />
-                    </button>
-                  </td>
-                </tr>
-              {/each}
-            </table>
-          {:else}
-            <p class={css({ fontSize: "xs", color: "slate.400" })}>
-              No any incomes
-            </p>
-          {/if}
-        </div>
+                        <Amount value={amount} currency="GEL" />
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        class={button({ variant: "icon" })}
+                        on:click={() => deleteRecord(id)}
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                {/each}
+              </table>
+            {:else}
+              <p class={css({ fontSize: "xs", color: "slate.400" })}>
+                No any incomes
+              </p>
+            {/if}
+          </div>
+        {/each}
       {/each}
 
       <form on:submit|preventDefault={addRecord}>
@@ -294,12 +329,14 @@
       <div class={grid({ columns: 2 })}>
         <Field
           title="Field 15"
+          badge={`${settlementYear}`}
           subtitle="Income from the beginning of a calendar year with the increased sum"
           value={yearSum}
         />
         <Field
           title="Field 17"
-          subtitle="Taxable income corresponding with the reporting months"
+          badge={MONTHS[settlementMonth]}
+          subtitle="Taxable income corresponding with the reporting month"
           value={monthSum}
         />
       </div>

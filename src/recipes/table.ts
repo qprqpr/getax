@@ -21,7 +21,7 @@ export default defineRecipe({
       px: 1,
     },
     '& td:first-child': {
-      w: 28,
+      w: 32,
       bg: "slate.50",
       borderRight: "1px solid",
       borderColor: "slate.200",
