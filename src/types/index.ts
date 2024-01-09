@@ -62,7 +62,7 @@ export const CURRENCIES = [
   ["EGP", "Egyptian Pound"],
   ["EUR", "Euro"],
   ["GBP", "United Kingdom Pound"],
-  // ["GEL", "Georgian Lari"],
+  ["GEL", "Georgian Lari"],
   ["HKD", "Hong-Kong Dollar"],
   ["HUF", "Hungarian Forint"],
   ["ILS", "Israeli Shekel"],

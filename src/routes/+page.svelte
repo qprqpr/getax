@@ -154,32 +154,43 @@
   const addRecord = async () => {
     if (!session) return;
 
+    let quantity: number | undefined;
+    let rate: number | undefined;
+
     loading = true;
 
-    const rates = await getExchangeRate(incomeForm.date);
+    if (incomeForm.currency === "GEL") {
+      quantity = 1;
+      rate = 1;
+    } else {
+      const rates = await getExchangeRate(incomeForm.date);
+      if (rates && rates.length === 1) {
+        const [dayRates] = rates;
+        const currencyRate = dayRates.currencies.find(
+          (item) => item.code === incomeForm.currency
+        );
 
-    if (rates && rates.length === 1) {
-      const [dayRates] = rates;
-      const currencyRate = dayRates.currencies.find(
-        (item) => item.code === incomeForm.currency
-      );
-
-      if (currencyRate) {
-        const { quantity, rate } = currencyRate;
-        const income = parseFloat(incomeForm.income);
-        const amount = Math.ceil((income / quantity) * rate * 100) / 100;
-        await supabase.from("records").insert<IncomeInsert>({
-          uid: session.user.id,
-          date: incomeForm.date,
-          currency: incomeForm.currency,
-          rate: Math.round((rate / quantity) * 10000) / 10000,
-          income,
-          amount,
-        });
-        toast("New income has been added");
-        await loadRecords();
-        incomeForm.income = "";
+        if (currencyRate) {
+          quantity = currencyRate.quantity;
+          rate = currencyRate.rate;
+        }
       }
+    }
+
+    if (quantity && rate) {
+      const income = parseFloat(incomeForm.income);
+      const amount = Math.ceil((income / quantity) * rate * 100) / 100;
+      await supabase.from("records").insert<IncomeInsert>({
+        uid: session.user.id,
+        date: incomeForm.date,
+        currency: incomeForm.currency,
+        rate: Math.round((rate / quantity) * 10000) / 10000,
+        income,
+        amount,
+      });
+      toast("New income has been added");
+      await loadRecords();
+      incomeForm.income = "";
     }
 
     loading = false;
